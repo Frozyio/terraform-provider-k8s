@@ -147,7 +147,7 @@ func resourceManifestCreate(d *schema.ResourceData, m interface{}) error {
 
 	validate := d.Get("validate").(bool)
 	applyArgs := []string{"apply"}
-	if validate {
+	if !validate {
 		applyArgs = append(applyArgs, "--validate=false")
 	}
 	applyArgs = append(applyArgs, "-f", "-")
