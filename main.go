@@ -67,6 +67,11 @@ func resourceManifest() *schema.Resource {
 				Required:  true,
 				Sensitive: true,
 			},
+			"validate": &schema.Schema{
+				Type:     schema.TypeBool,
+				Optional: true,
+				Default:  true,
+			},
 		},
 	}
 }
@@ -140,7 +145,13 @@ func resourceManifestCreate(d *schema.ResourceData, m interface{}) error {
 	}
 	defer cleanup()
 
-	cmd := kubectl(m, kubeconfig, "apply", "-f", "-")
+	validate := d.Get("validate").(bool)
+	applyArgs := []string{"apply"}
+	if validate {
+		applyArgs = append(applyArgs, "--validate=false")
+	}
+	applyArgs = append(applyArgs, "-f", "-")
+	cmd := kubectl(m, kubeconfig, applyArgs...)
 	cmd.Stdin = strings.NewReader(d.Get("content").(string))
 	if err := run(cmd); err != nil {
 		return err
