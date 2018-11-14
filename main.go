@@ -72,6 +72,10 @@ func resourceManifest() *schema.Resource {
 				Optional: true,
 				Default:  true,
 			},
+			"kind": &schema.Schema{
+				Type:     schema.TypeString,
+				Computed: true,
+			},
 		},
 	}
 }
@@ -167,6 +171,7 @@ func resourceManifestCreate(d *schema.ResourceData, m interface{}) error {
 
 	var data struct {
 		Items []struct {
+			Kind     string `json:"kind"`
 			Metadata struct {
 				Selflink string `json:"selflink"`
 			} `json:"metadata"`
@@ -183,6 +188,7 @@ func resourceManifestCreate(d *schema.ResourceData, m interface{}) error {
 		return fmt.Errorf("could not parse self-link from response %s", stdout.String())
 	}
 	d.SetId(selflink)
+	d.Set("kind", data.Items[0].Kind)
 	return nil
 }
 
@@ -198,12 +204,23 @@ func resourceManifestUpdate(d *schema.ResourceData, m interface{}) error {
 	return run(cmd)
 }
 
-func resourceFromSelflink(s string) (resource, namespace string, ok bool) {
-	parts := strings.Split(s, "/")
+func resourceFromResourceData(d *schema.ResourceData) (resource, namespace string, ok bool) {
+	var kind string
+	kindIface, ok := d.GetOk("kind")
+	if ok {
+		kind = kindIface.(string)
+	} else {
+		kind = ""
+	}
+	parts := strings.Split(d.Id(), "/")
 	if len(parts) < 2 {
 		return "", "", false
 	}
-	resource = parts[len(parts)-2] + "/" + parts[len(parts)-1]
+	if kind == "" {
+		resource = parts[len(parts)-2] + "/" + parts[len(parts)-1]
+	} else {
+		resource = kind + "/" + parts[len(parts)-1]
+	}
 
 	for i, part := range parts {
 		if part == "namespaces" && len(parts) > i+1 {
@@ -215,7 +232,7 @@ func resourceFromSelflink(s string) (resource, namespace string, ok bool) {
 }
 
 func resourceManifestDelete(d *schema.ResourceData, m interface{}) error {
-	resource, namespace, ok := resourceFromSelflink(d.Id())
+	resource, namespace, ok := resourceFromResourceData(d)
 	if !ok {
 		return fmt.Errorf("invalid resource id: %s", d.Id())
 	}
@@ -234,7 +251,7 @@ func resourceManifestDelete(d *schema.ResourceData, m interface{}) error {
 }
 
 func resourceManifestRead(d *schema.ResourceData, m interface{}) error {
-	resource, namespace, ok := resourceFromSelflink(d.Id())
+	resource, namespace, ok := resourceFromResourceData(d)
 	if !ok {
 		return fmt.Errorf("invalid resource id: %s", d.Id())
 	}
